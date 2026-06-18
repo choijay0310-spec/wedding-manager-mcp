@@ -1,0 +1,32 @@
+{
+  "name": "wedding-manager-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "verify": "npm run build && node scripts/verify-playmcp.mjs",
+    "test:all": "npm run build --silent && node scripts/call-tool.mjs all",
+    "test:timeline": "npm run build --silent && node scripts/call-tool.mjs wedding_timeline",
+    "test:budget": "npm run build --silent && node scripts/call-tool.mjs wedding_budget_review",
+    "test:quotes": "npm run build --silent && node scripts/call-tool.mjs vendor_quote_compare",
+    "test:tasks": "npm run build --silent && node scripts/call-tool.mjs wedding_task_brief",
+    "test:message": "npm run build --silent && node scripts/call-tool.mjs wedding_message_writer",
+    "inspect": "npx @modelcontextprotocol/inspector http://localhost:3000/mcp"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
