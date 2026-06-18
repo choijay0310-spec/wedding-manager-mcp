@@ -169,13 +169,13 @@ export function createWeddingMcpServer(): McpServer {
     "wedding_timeline",
     {
       title: "Wedding Timeline",
-      description: `Creates a D-day wedding preparation timeline with immediate next actions using ${serviceName}.`,
+      description: `${serviceName}가 예식일까지 남은 기간을 기준으로 지금 해야 할 결혼 준비 일정과 확인 질문을 정리합니다.`,
       inputSchema: {
         weddingDate: z.string().describe("Wedding date. Supports YYYY-MM-DD, YYYY.M.D, or 2026년 10월 3일."),
         currentDate: z.string().optional().describe("Current date. Defaults to today."),
         priorities: z.array(z.string()).optional().describe("Known priorities such as venue, budget, family, guests, honeymoon.")
       },
-      annotations: { title: "Wedding Timeline", ...readOnlyAnnotations }
+      annotations: { title: "결혼 준비 일정", ...readOnlyAnnotations }
     },
     async ({ weddingDate, currentDate, priorities }) => {
       const target = parseDate(weddingDate);
@@ -213,7 +213,7 @@ export function createWeddingMcpServer(): McpServer {
     "wedding_budget_review",
     {
       title: "Wedding Budget Review",
-      description: `Reviews wedding budget items, cash timing, and overspend risk using ${serviceName}.`,
+      description: `${serviceName}가 결혼 준비 예산, 예상 축의금 반영 후 현금 부담, 누락된 지출 항목, 줄일 수 있는 비용 후보를 점검합니다.`,
       inputSchema: {
         totalBudget: moneySchema.describe("Total wedding budget in KRW. Strings like 3천만원 are accepted."),
         expectedGiftMoney: optionalMoneySchema.describe("Expected congratulatory money offset, if the user wants cash-flow view."),
@@ -223,7 +223,7 @@ export function createWeddingMcpServer(): McpServer {
           required: z.boolean().optional()
         })).describe("Budget items with KRW amounts.")
       },
-      annotations: { title: "Wedding Budget Review", ...readOnlyAnnotations }
+      annotations: { title: "결혼 예산 점검", ...readOnlyAnnotations }
     },
     async ({ totalBudget, expectedGiftMoney, items }) => {
       const spent = items.reduce((sum, item) => sum + item.amount, 0);
@@ -274,7 +274,7 @@ export function createWeddingMcpServer(): McpServer {
     "vendor_quote_compare",
     {
       title: "Vendor Quote Compare",
-      description: `Compares wedding vendor quotes and identifies contract risk using ${serviceName}.`,
+      description: `${serviceName}가 웨딩홀, 스드메, 본식 스냅 등 업체 견적을 비교하고 별도 비용과 계약 리스크를 찾아줍니다.`,
       inputSchema: {
         quotes: z.array(z.object({
           vendorName: z.string(),
@@ -285,7 +285,7 @@ export function createWeddingMcpServer(): McpServer {
           memo: z.string().optional()
         })).min(2).describe("At least two vendor quotes to compare.")
       },
-      annotations: { title: "Vendor Quote Compare", ...readOnlyAnnotations }
+      annotations: { title: "업체 견적 비교", ...readOnlyAnnotations }
     },
     async ({ quotes }) => {
       const enriched = quotes
@@ -323,7 +323,7 @@ export function createWeddingMcpServer(): McpServer {
     "wedding_task_brief",
     {
       title: "Wedding Task Brief",
-      description: `Turns wedding tasks into a concise owner-by-owner coordination brief using ${serviceName}.`,
+      description: `${serviceName}가 결혼 준비 작업을 담당자별로 정리하고 가족이나 파트너에게 공유할 수 있는 진행 브리프를 만듭니다.`,
       inputSchema: {
         tasks: z.array(z.object({
           task: z.string(),
@@ -333,7 +333,7 @@ export function createWeddingMcpServer(): McpServer {
         })).describe("Wedding tasks to summarize."),
         audience: z.string().optional().describe("Audience such as parents, partner, planner, or friends.")
       },
-      annotations: { title: "Wedding Task Brief", ...readOnlyAnnotations }
+      annotations: { title: "역할 분담 브리프", ...readOnlyAnnotations }
     },
     async ({ tasks, audience }) => {
       const active = tasks.map(task => ({ ...task, normalizedStatus: normalizeStatus(task.status) })).filter(task => task.normalizedStatus !== "done");
@@ -362,14 +362,14 @@ export function createWeddingMcpServer(): McpServer {
     "wedding_message_writer",
     {
       title: "Wedding Message Writer",
-      description: `Writes practical Korean wedding coordination messages using ${serviceName}.`,
+      description: `${serviceName}가 가족, 파트너, 친구, 웨딩 업체에 보낼 결혼 준비 공유 문구와 확인 요청 메시지를 작성합니다.`,
       inputSchema: {
         recipient: z.string().describe("Recipient such as family, 업체, friend, partner."),
         purpose: z.string().describe("Message purpose."),
         facts: z.array(z.string()).describe("Facts to include."),
         tone: z.string().optional().describe("Tone such as 정중하게, 따뜻하게, 단호하게, 짧게.")
       },
-      annotations: { title: "Wedding Message Writer", ...readOnlyAnnotations }
+      annotations: { title: "공유 문구 작성", ...readOnlyAnnotations }
     },
     async ({ recipient, purpose, facts, tone }) => {
       const target = normalizeRecipient(recipient);
