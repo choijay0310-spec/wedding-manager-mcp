@@ -72,6 +72,11 @@ function money(value: number): string {
   return `${Math.round(value).toLocaleString("ko-KR")}원`;
 }
 
+function percent(part: number, total: number): string {
+  if (!total) return "0%";
+  return `${Math.round((part / total) * 100)}%`;
+}
+
 function normalizeStatus(status: string | undefined): "todo" | "doing" | "done" | "blocked" {
   if (!status) return "todo";
   const lower = status.toLowerCase();
@@ -79,6 +84,13 @@ function normalizeStatus(status: string | undefined): "todo" | "doing" | "done" 
   if (["doing", "진행", "진행중", "작업중"].includes(lower)) return "doing";
   if (["blocked", "보류", "막힘", "확인필요"].includes(lower)) return "blocked";
   return "todo";
+}
+
+function statusLabel(status: "todo" | "doing" | "done" | "blocked"): string {
+  if (status === "doing") return "진행중";
+  if (status === "done") return "완료";
+  if (status === "blocked") return "확인 필요";
+  return "미시작";
 }
 
 function normalizeRecipient(value: string): "family" | "vendor" | "friend" | "partner" {
@@ -96,6 +108,16 @@ function normalizeTone(value: string | undefined): "polite" | "warm" | "firm" | 
   if (["단호", "확실", "firm"].some(token => lower.includes(token))) return "firm";
   if (["따뜻", "부드럽", "warm"].some(token => lower.includes(token))) return "warm";
   return "polite";
+}
+
+function vendorFactRequest(fact: string): string {
+  if (/잔금|취소|변경|수수료|기준일|납품일|마감/.test(fact)) {
+    return `${fact}: 정확한 날짜, 발생 조건, 계약서 반영 가능 여부 확인 부탁드립니다.`;
+  }
+  if (/출장|추가|별도|금액|비용|봉사료|음주류|앨범|원본|보정/.test(fact)) {
+    return `${fact}: 포함/별도 여부와 추가 금액 상한 확인 부탁드립니다.`;
+  }
+  return `${fact}: 가능 여부와 견적 변동 여부 확인 부탁드립니다.`;
 }
 
 function timelineForDday(dday: number): string[] {
@@ -134,18 +156,43 @@ function timelineForDday(dday: number): string[] {
   ];
 }
 
+function weeklyDeadlineForDday(dday: number): string[] {
+  if (dday < 0) {
+    return [
+      "축의금/지출 정산표를 실제 입금·결제 기준으로 마감",
+      "사진 셀렉, 앨범 옵션, 감사 인사 발송 대상 확정"
+    ];
+  }
+  if (dday > 120) {
+    return [
+      "웨딩홀·스드메·스냅의 계약금/중도금/잔금일을 한 캘린더에 입력",
+      "양가 의사결정이 필요한 항목을 예산, 날짜, 하객 범위 3개로 압축"
+    ];
+  }
+  if (dday > 45) {
+    return [
+      "청첩장 발송 대상 1차 마감과 보증 인원 조정 가능일 확인",
+      "본식 스냅, DVD, 사회자, 축가 담당자의 당일 도착 시간 수집"
+    ];
+  }
+  return [
+    "최종 하객 수와 보증 인원 차이를 확인하고 식권·좌석·답례품 수량 확정",
+    "업체별 당일 담당자 연락처, 잔금, 추가 옵션 금액을 한 장으로 정리"
+  ];
+}
+
 function pendingTimelineAdvice(openItems: string[] | undefined): string[] {
   if (!openItems?.length) return [];
 
   return openItems.map(item => {
     if (/청첩|초대/.test(item)) {
-      return `${item}: 문구 확정 -> 모바일/종이 제작 -> 발송 대상 분리까지 한 번에 마감하세요.`;
+      return `${item}: 문구 확정 -> 모바일/종이 제작 -> 발송 대상 분리까지 마감하세요. 늦어지면 참석률 예측과 보증 인원 조정이 같이 밀립니다.`;
     }
     if (/하객|명단|리스트|인원/.test(item)) {
-      return `${item}: 양가/친구/직장으로 나누고, 보증 인원 대비 참석 가능성을 높음/보통/낮음으로 표시하세요.`;
+      return `${item}: 양가/친구/직장으로 나누고 참석 가능성을 높음/보통/낮음으로 표시하세요. 보증 인원 변경 가능일 전까지 숫자를 잠가야 식대 손실을 줄입니다.`;
     }
     if (/BGM|음악|식전영상|영상|축가/.test(item)) {
-      return `${item}: 곡/영상 후보를 3개 이하로 줄이고, 사회자 큐시트와 입장/퇴장 타이밍에 연결하세요.`;
+      return `${item}: 곡/영상 후보를 3개 이하로 줄이고 사회자 큐시트와 입장/퇴장 타이밍에 연결하세요. 늦어지면 리허설과 음향 체크가 부실해집니다.`;
     }
     if (/잔금|계약|취소|수수료/.test(item)) {
       return `${item}: 계약서 문장, 잔금일, 변경/취소 수수료 기준일을 캘린더에 같이 넣으세요.`;
@@ -164,6 +211,29 @@ function classifyBudgetItem(name: string): "venue" | "vendor" | "beauty" | "gues
   if (/스드메|드레스|메이크|헤어|예복|한복|헬퍼|피팅/.test(name)) return "beauty";
   if (/청첩|답례|버스|주차|하객|식권/.test(name)) return "guest";
   return "other";
+}
+
+function budgetHealth(remaining: number, totalBudget: number): string {
+  if (remaining < 0) return "초과 상태입니다. 선택 옵션, 추가 촬영, 앨범류부터 즉시 조정해야 합니다.";
+  if (remaining / totalBudget < 0.05) return "여유가 5% 미만입니다. 하객 변동과 별도 비용을 감안하면 사실상 빠듯합니다.";
+  if (remaining / totalBudget < 0.15) return "여유가 크지는 않습니다. 잔금일 전까지 선택 옵션 추가를 보수적으로 봐야 합니다.";
+  return "현재는 예산 내입니다. 다만 하객 수와 별도 비용이 확정되기 전까지 여유분을 남겨두는 편이 안전합니다.";
+}
+
+function budgetActionBuckets(items: Array<{ name: string; amount: number; required?: boolean }>): string[] {
+  const optionalItems = items.filter(item => item.required === false || classifyBudgetItem(item.name) === "optional");
+  if (!optionalItems.length) return ["- 선택 옵션이 따로 표시되지 않았습니다. 각 항목에 필수/선택 여부를 붙이면 삭감 순서를 잡기 쉽습니다."];
+
+  const deletable = optionalItems.filter(item => /업그레이드|추가|고급|옵션/.test(item.name));
+  const negotiable = optionalItems.filter(item => /앨범|원본|출장|봉사|보정/.test(item.name));
+  const holdable = optionalItems.filter(item => /DVD|영상|플라워|장식/.test(item.name));
+
+  return [
+    negotiable.length ? `- 협상 가능: ${negotiable.map(item => `${item.name} ${money(item.amount)}`).join(", ")}` : "- 협상 가능: 앨범, 원본, 출장비, 봉사료는 업체에 포함/상한 금액을 다시 요청하세요.",
+    deletable.length ? `- 삭제 가능: ${deletable.map(item => `${item.name} ${money(item.amount)}`).join(", ")}` : "- 삭제 가능: 드레스 업그레이드, 추가 보정, 고급 답례품처럼 만족도 대비 비용이 큰 항목을 먼저 보세요.",
+    holdable.length ? `- 보류 가능: ${holdable.map(item => `${item.name} ${money(item.amount)}`).join(", ")}` : "- 보류 가능: DVD, 식전영상, 일부 장식 옵션은 예산 여유 확인 후 결정해도 됩니다.",
+    "- 줄이면 안 되는 항목: 식대, 필수 촬영, 혼주 관련 필수 일정처럼 당일 진행 품질에 직접 영향 있는 항목입니다."
+  ];
 }
 
 function quoteRisk(quote: { category: string; included?: string[]; excluded?: string[]; memo?: string }): string[] {
@@ -248,6 +318,7 @@ export function createWeddingMcpServer(): McpServer {
       const tasks = timelineForDday(dday);
       const focus = priorities?.length ? priorities.join(", ") : "예산, 하객, 업체 계약";
       const pendingAdvice = pendingTimelineAdvice(openItems);
+      const weeklyDeadlines = weeklyDeadlineForDday(dday);
 
       return {
         content: [{
@@ -264,6 +335,14 @@ export function createWeddingMcpServer(): McpServer {
             ] : []),
             "### 지금 바로 할 일",
             ...tasks.map(task => `- ${task}`),
+            "",
+            "### 이번 주 안에 마감할 것",
+            ...weeklyDeadlines.map(task => `- ${task}`),
+            "",
+            "### 하객/보증 인원 체크",
+            "- 현재 보증 인원, 예상 참석 인원, 식대 단가를 따로 적어두세요.",
+            "- 예상 참석 인원이 보증 인원보다 낮으면 보증 인원 변경 가능 마감일을 먼저 확인하세요.",
+            "- 식권 정산 방식이 선불, 당일 정산, 미사용 환불 가능 중 무엇인지 계약서 문장으로 확인하세요.",
             "",
             "### 놓치기 쉬운 확인 질문",
             "- 계약서에 포함/별도 비용이 문장으로 적혀 있나요?",
@@ -307,6 +386,7 @@ export function createWeddingMcpServer(): McpServer {
         ["guest", "청첩장/답례품/버스/주차"]
       ].filter(([key]) => !buckets[key]).map(([, label]) => label);
       const optionalCandidates = items.filter(item => item.required === false || classifyBudgetItem(item.name) === "optional");
+      const actionBuckets = budgetActionBuckets(items);
 
       return {
         content: [{
@@ -315,21 +395,26 @@ export function createWeddingMcpServer(): McpServer {
             `## ${serviceName} budget review`,
             `총예산: ${money(totalBudget)}`,
             `입력된 지출 합계: ${money(spent)}`,
-            `잔여/초과: ${money(remaining)}`,
+            `잔여/초과: ${money(remaining)} (${percent(remaining, totalBudget)})`,
             expectedGiftMoney ? `예상 축의금 반영 후 현금 부담: ${money(cashNeed)}` : "예상 축의금은 입력되지 않았습니다. 현금 흐름은 보수적으로 지출 전액 기준으로 보세요.",
+            `예산 상태: ${budgetHealth(remaining, totalBudget)}`,
             "",
             "### 항목별 분포",
-            `- 웨딩홀/식대: ${money(buckets.venue ?? 0)}`,
-            `- 스드메/예복/한복: ${money(buckets.beauty ?? 0)}`,
-            `- 본식 업체: ${money(buckets.vendor ?? 0)}`,
-            `- 하객/운영: ${money(buckets.guest ?? 0)}`,
-            `- 옵션/기타: ${money((buckets.optional ?? 0) + (buckets.other ?? 0))}`,
+            `- 웨딩홀/식대: ${money(buckets.venue ?? 0)} (${percent(buckets.venue ?? 0, spent)})`,
+            `- 스드메/예복/한복: ${money(buckets.beauty ?? 0)} (${percent(buckets.beauty ?? 0, spent)})`,
+            `- 본식 업체: ${money(buckets.vendor ?? 0)} (${percent(buckets.vendor ?? 0, spent)})`,
+            `- 하객/운영: ${money(buckets.guest ?? 0)} (${percent(buckets.guest ?? 0, spent)})`,
+            `- 옵션/기타: ${money((buckets.optional ?? 0) + (buckets.other ?? 0))} (${percent((buckets.optional ?? 0) + (buckets.other ?? 0), spent)})`,
             "",
             "### 바로 볼 리스크",
             remaining < 0 ? `- 예산을 ${money(Math.abs(remaining))} 초과했습니다.` : `- 현재 ${money(remaining)} 여유가 있습니다.`,
             missing.length ? `- 아직 입력되지 않은 큰 항목: ${missing.join(", ")}` : "- 주요 항목은 모두 한 번씩 입력되어 있습니다.",
             optionalCandidates.length ? `- 줄이기 후보: ${optionalCandidates.map(item => `${item.name} ${money(item.amount)}`).join(", ")}` : "- 선택/옵션 항목이 따로 표시되지 않았습니다.",
-            "- 하객 50명이 늘거나 줄면 식대와 답례품이 크게 바뀝니다. 식대 단가를 별도 항목으로 두면 재계산이 쉬워집니다."
+            "- 하객 50명이 늘거나 줄면 식대와 답례품이 크게 바뀝니다. 식대 단가를 별도 항목으로 두면 재계산이 쉬워집니다.",
+            expectedGiftMoney ? "- 축의금은 예식 후 들어오는 돈입니다. 잔금일이 예식 전이면 선현금 부족 가능성을 따로 봐야 합니다." : "- 축의금 예상액을 넣으면 예식 후 최종 부담과 예식 전 선현금을 나눠 볼 수 있습니다.",
+            "",
+            "### 예산 조정 액션",
+            ...actionBuckets
           ].join("\n")
         }]
       };
@@ -360,6 +445,8 @@ export function createWeddingMcpServer(): McpServer {
       const cheapest = enriched[0];
       const bestComparable = [...enriched].sort((a, b) => a.risks.length - b.risks.length || a.price - b.price)[0];
       const questions = quoteQuestionSet(quotes);
+      const highest = enriched[enriched.length - 1];
+      const priceGap = highest.price - cheapest.price;
 
       return {
         content: [{
@@ -368,6 +455,7 @@ export function createWeddingMcpServer(): McpServer {
             `## ${serviceName} vendor comparison`,
             `가장 낮은 견적: ${cheapest.vendorName} ${money(cheapest.price)}`,
             `가장 비교 가능한 견적: ${bestComparable.vendorName} (${bestComparable.risks.length}개 확인 필요)`,
+            `견적 차이: ${money(priceGap)} (${cheapest.vendorName} 대비 ${highest.vendorName})`,
             "",
             "### 견적별 리스크",
             ...enriched.map(quote => {
@@ -375,6 +463,12 @@ export function createWeddingMcpServer(): McpServer {
               const excluded = quote.excluded?.length ? ` / 별도: ${quote.excluded.join(", ")}` : "";
               return `- ${quote.vendorName} (${quote.category}) ${money(quote.price)}: ${risk}${excluded}`;
             }),
+            "",
+            "### 실제 총액 판단",
+            `- ${cheapest.vendorName}은 표시 견적이 가장 낮지만 별도 비용이 ${money(priceGap)} 이상 붙으면 가격 장점이 사라집니다.`,
+            `- ${bestComparable.vendorName}은 확인 필요 항목이 적어 계약서 비교 기준으로 먼저 삼기 좋습니다.`,
+            "- 별도 비용은 '발생 가능'이 아니라 '최대 얼마까지 발생하는지'로 받아야 합니다.",
+            "- 구두 안내가 아니라 견적서, 계약서, 특약 문장 중 하나로 남기세요.",
             "",
             "### 업체에 보낼 확인 질문",
             ...questions.map(question => `- ${question}`)
@@ -401,8 +495,16 @@ export function createWeddingMcpServer(): McpServer {
       annotations: { title: "역할 분담 브리프", ...readOnlyAnnotations }
     },
     async ({ tasks, audience }) => {
-      const active = tasks.map(task => ({ ...task, normalizedStatus: normalizeStatus(task.status) })).filter(task => task.normalizedStatus !== "done");
+      const active = tasks
+        .map(task => ({ ...task, normalizedStatus: normalizeStatus(task.status) }))
+        .filter(task => task.normalizedStatus !== "done")
+        .sort((a, b) => {
+          if (a.normalizedStatus === "blocked" && b.normalizedStatus !== "blocked") return -1;
+          if (a.normalizedStatus !== "blocked" && b.normalizedStatus === "blocked") return 1;
+          return (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31");
+        });
       const blocked = active.filter(task => task.normalizedStatus === "blocked");
+      const owners = [...new Set(active.map(task => task.owner))];
       return {
         content: [{
           type: "text",
@@ -410,13 +512,20 @@ export function createWeddingMcpServer(): McpServer {
             `## ${serviceName} task brief`,
             `공유 대상: ${audience ?? "결혼 준비 팀"}`,
             "",
+            "### 요약",
+            `- 남은 작업 ${active.length}개, 확인 필요 ${blocked.length}개, 담당자 ${owners.length}명입니다.`,
+            blocked.length ? "- 확인 필요 항목부터 먼저 풀어야 뒤 일정이 밀리지 않습니다." : "- 현재 막힌 항목은 없습니다. 마감일이 가까운 순서로 처리하면 됩니다.",
+            "",
             "### 담당자별 진행 필요",
-            ...(active.length ? active.map(task => `- ${task.owner}: ${task.task}${task.dueDate ? ` (${task.dueDate}까지)` : ""}${task.normalizedStatus === "blocked" ? " - 확인 필요" : ""}`) : ["- 현재 남은 작업이 없습니다."]),
+            ...(active.length ? active.map(task => `- ${task.owner}: ${task.task}${task.dueDate ? ` (${task.dueDate}까지)` : ""} - ${statusLabel(task.normalizedStatus)}`) : ["- 현재 남은 작업이 없습니다."]),
+            "",
+            "### 오늘 보낼 확인 요청",
+            ...(active.length ? active.slice(0, 3).map(task => `- ${task.owner} -> 확인 대상: ${task.task.includes("웨딩홀") ? "웨딩홀 담당자" : task.owner === "양가" ? "양가 부모님" : "관련 담당자"} / 요청: ${task.task} 가능 여부와 막힌 부분을 오늘 공유`) : ["- 보낼 요청이 없습니다."]),
             "",
             blocked.length ? `### 먼저 풀어야 할 막힘\n${blocked.map(task => `- ${task.task}`).join("\n")}` : "### 먼저 풀어야 할 막힘\n- 현재 보류로 표시된 작업은 없습니다.",
             "",
             "### 그대로 보낼 공유 문구",
-            `현재 남은 결혼 준비 작업은 ${active.length}개입니다. 담당자별로 필요한 것만 정리했으니 각자 맡은 항목의 일정과 막힌 부분만 확인 부탁드립니다.`
+            `현재 남은 결혼 준비 작업은 ${active.length}개입니다. 확인 필요한 항목은 ${blocked.length}개라서 이 부분부터 먼저 정리하려고 합니다. 담당자별로 맡은 항목의 가능 여부와 막힌 부분만 답변 부탁드립니다.`
           ].join("\n")
         }]
       };
@@ -439,16 +548,17 @@ export function createWeddingMcpServer(): McpServer {
     async ({ recipient, purpose, facts, tone }) => {
       const target = normalizeRecipient(recipient);
       const normalizedTone = normalizeTone(tone);
-      const factLine = facts.join(", ");
-      const vendorEnding = normalizedTone === "firm" ? "가능 여부와 추가 비용을 오늘 중 회신 부탁드립니다." : "확인 가능하실 때 회신 부탁드립니다.";
+      const factLine = facts.join(" / ");
+      const vendorEnding = normalizedTone === "firm" ? "가능 여부, 추가 비용, 계약서 반영 가능 여부를 오늘 중 회신 부탁드립니다." : "가능 여부와 추가 비용이 있다면 함께 회신 부탁드립니다.";
+      const shortPrefix = normalizedTone === "warm" ? "안녕하세요. 준비 상황 공유드려요." : "안녕하세요.";
       const variants = target === "vendor"
         ? [
-            `안녕하세요. ${purpose} 관련해서 확인 요청드립니다. ${factLine}. ${vendorEnding}`,
-            `안녕하세요. 아래 내용 기준으로 진행 가능 여부와 견적 변동 여부 확인 부탁드립니다.\n${facts.map(fact => `- ${fact}`).join("\n")}\n감사합니다.`
+            `안녕하세요. ${purpose} 관련해 확인 부탁드립니다. ${factLine}. ${vendorEnding}`,
+            `안녕하세요. ${purpose} 관련해서 아래 항목 확인 요청드립니다.\n${facts.map(fact => `- ${vendorFactRequest(fact)}`).join("\n")}\n가능하다면 답변 내용을 견적서 또는 계약서에 반영 부탁드립니다. 감사합니다.`
           ]
         : [
-            `${purpose} 관련해서 공유드려요. ${factLine}. 확인 필요한 부분 있으면 편하게 말씀 주세요.`,
-            `안녕하세요. 결혼 준비 상황 공유드립니다.\n${facts.map(fact => `- ${fact}`).join("\n")}\n각자 확인 필요한 부분만 봐주시면 감사하겠습니다.`
+            `${shortPrefix} ${purpose} 관련해서 공유드립니다. ${factLine}. 결정이 필요한 부분만 답변 부탁드려요.`,
+            `안녕하세요. ${purpose} 관련해서 정리드립니다.\n${facts.map(fact => `- ${fact}`).join("\n")}\n각자 확인 가능한 부분만 먼저 봐주시고, 의견이 필요한 항목은 답변 부탁드립니다.`
           ];
 
       return {
