@@ -79,10 +79,11 @@ function percent(part: number, total: number): string {
 
 function normalizeStatus(status: string | undefined): "todo" | "doing" | "done" | "blocked" {
   if (!status) return "todo";
-  const lower = status.toLowerCase();
+  const lower = status.toLowerCase().replace(/\s+/g, "");
   if (["done", "완료", "끝", "처리완료"].includes(lower)) return "done";
   if (["doing", "진행", "진행중", "작업중"].includes(lower)) return "doing";
-  if (["blocked", "보류", "막힘", "확인필요"].includes(lower)) return "blocked";
+  if (["blocked", "보류", "막힘", "확인필요", "필요"].includes(lower)) return "blocked";
+  if (lower.includes("확인") || lower.includes("필요") || lower.includes("대기")) return "blocked";
   return "todo";
 }
 
@@ -91,6 +92,18 @@ function statusLabel(status: "todo" | "doing" | "done" | "blocked"): string {
   if (status === "done") return "완료";
   if (status === "blocked") return "확인 필요";
   return "미시작";
+}
+
+function taskCheckTarget(task: { task: string; owner: string }): string {
+  if (/웨딩홀|식대|보증|잔금/.test(task.task)) return "웨딩홀 담당자";
+  if (/청첩/.test(task.task)) return "청첩장 업체 또는 문구 결정자";
+  if (/한복|예복|드레스|메이크/.test(task.task)) return "의상 업체와 양가 부모님";
+  if (/축가/.test(task.task)) return "축가 후보자";
+  if (/사회자/.test(task.task)) return "사회자 후보 또는 섭외 담당자";
+  if (/하객|리스트|명단/.test(task.task)) return "양가 부모님";
+  if (task.owner === "양가") return "양가 부모님";
+  if (/친구|지인/.test(task.owner)) return "해당 지인";
+  return "관련 담당자";
 }
 
 function normalizeRecipient(value: string): "family" | "vendor" | "friend" | "partner" {
@@ -520,7 +533,7 @@ export function createWeddingMcpServer(): McpServer {
             ...(active.length ? active.map(task => `- ${task.owner}: ${task.task}${task.dueDate ? ` (${task.dueDate}까지)` : ""} - ${statusLabel(task.normalizedStatus)}`) : ["- 현재 남은 작업이 없습니다."]),
             "",
             "### 오늘 보낼 확인 요청",
-            ...(active.length ? active.slice(0, 3).map(task => `- ${task.owner} -> 확인 대상: ${task.task.includes("웨딩홀") ? "웨딩홀 담당자" : task.owner === "양가" ? "양가 부모님" : "관련 담당자"} / 요청: ${task.task} 가능 여부와 막힌 부분을 오늘 공유`) : ["- 보낼 요청이 없습니다."]),
+            ...(active.length ? active.slice(0, 3).map(task => `- ${task.owner} -> 확인 대상: ${taskCheckTarget(task)} / 요청: ${task.task} 가능 여부와 막힌 부분을 오늘 공유`) : ["- 보낼 요청이 없습니다."]),
             "",
             blocked.length ? `### 먼저 풀어야 할 막힘\n${blocked.map(task => `- ${task.task}`).join("\n")}` : "### 먼저 풀어야 할 막힘\n- 현재 보류로 표시된 작업은 없습니다.",
             "",
