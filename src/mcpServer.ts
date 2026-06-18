@@ -134,12 +134,35 @@ function timelineForDday(dday: number): string[] {
   ];
 }
 
+function pendingTimelineAdvice(openItems: string[] | undefined): string[] {
+  if (!openItems?.length) return [];
+
+  return openItems.map(item => {
+    if (/청첩|초대/.test(item)) {
+      return `${item}: 문구 확정 -> 모바일/종이 제작 -> 발송 대상 분리까지 한 번에 마감하세요.`;
+    }
+    if (/하객|명단|리스트|인원/.test(item)) {
+      return `${item}: 양가/친구/직장으로 나누고, 보증 인원 대비 참석 가능성을 높음/보통/낮음으로 표시하세요.`;
+    }
+    if (/BGM|음악|식전영상|영상|축가/.test(item)) {
+      return `${item}: 곡/영상 후보를 3개 이하로 줄이고, 사회자 큐시트와 입장/퇴장 타이밍에 연결하세요.`;
+    }
+    if (/잔금|계약|취소|수수료/.test(item)) {
+      return `${item}: 계약서 문장, 잔금일, 변경/취소 수수료 기준일을 캘린더에 같이 넣으세요.`;
+    }
+    if (/한복|예복|드레스|메이크|스드메/.test(item)) {
+      return `${item}: 피팅/수령/반납 날짜와 별도 비용을 같은 메모에 묶어 확인하세요.`;
+    }
+    return `${item}: 담당자, 마감일, 업체 확인 필요 여부를 정해서 오늘 안에 다음 행동 1개를 확정하세요.`;
+  });
+}
+
 function classifyBudgetItem(name: string): "venue" | "vendor" | "beauty" | "guest" | "optional" | "other" {
+  if (/옵션|추가|업그레이드|앨범|원본/.test(name)) return "optional";
   if (/홀|식대|보증|대관|음주|봉사/.test(name)) return "venue";
   if (/스냅|DVD|영상|사회|축가|플래너/.test(name)) return "vendor";
-  if (/드레스|메이크|헤어|예복|한복|헬퍼|피팅/.test(name)) return "beauty";
+  if (/스드메|드레스|메이크|헤어|예복|한복|헬퍼|피팅/.test(name)) return "beauty";
   if (/청첩|답례|버스|주차|하객|식권/.test(name)) return "guest";
-  if (/옵션|추가|업그레이드|앨범|원본/.test(name)) return "optional";
   return "other";
 }
 
@@ -159,6 +182,42 @@ function quoteRisk(quote: { category: string; included?: string[]; excluded?: st
   return [...new Set([...missing, ...excluded])];
 }
 
+function quoteQuestionSet(quotes: Array<{ category: string; included?: string[]; excluded?: string[]; memo?: string }>): string[] {
+  const text = quotes
+    .map(quote => `${quote.category} ${(quote.included ?? []).join(" ")} ${(quote.excluded ?? []).join(" ")} ${quote.memo ?? ""}`)
+    .join(" ");
+
+  if (/홀|venue|식장|뷔페|식대|보증인원/.test(text)) {
+    return [
+      "식대, 보증인원, 대관료, 음주류, 봉사료, 부가세가 각각 포함인지 별도인지 계약서에 문장으로 적을 수 있나요?",
+      "최소 보증 인원 변경 가능 시점, 식권 정산 방식, 주차/버스/폐백실 비용을 알려주실 수 있나요?",
+      "잔금일, 날짜 변경 수수료, 취소 수수료 기준일을 계약서에 명시할 수 있나요?"
+    ];
+  }
+
+  if (/스냅|사진|DVD|영상|앨범|보정|원본/.test(text)) {
+    return [
+      "원본 제공, 보정 컷 수, 앨범 포함 여부, 납품 예정일이 견적에 포함되어 있나요?",
+      "대표 작가 지정, 2인 촬영, 촬영 시작/종료 시간, 출장비가 별도인지 확인 부탁드립니다.",
+      "잔금일, 일정 변경 수수료, 취소 수수료와 파일 보관 기간을 계약서에 명시할 수 있나요?"
+    ];
+  }
+
+  if (/스드메|드레스|메이크|헤어|피팅|헬퍼/.test(text)) {
+    return [
+      "피팅비, 헬퍼비, 드레스 업그레이드, 메이크업 리허설 비용이 포함인지 별도인지 알려주실 수 있나요?",
+      "촬영 드레스와 본식 드레스의 선택 범위, 추가금이 붙는 기준, 출장비 여부를 확인 부탁드립니다.",
+      "변경 가능 횟수, 잔금일, 취소 수수료 기준일을 계약서에 명시할 수 있나요?"
+    ];
+  }
+
+  return [
+    "이 견적에서 포함/별도 비용을 항목별로 나눠 계약서에 적을 수 있나요?",
+    "계약 후 추가될 수 있는 옵션과 최대 금액을 알려주실 수 있나요?",
+    "잔금일, 일정 변경 수수료, 취소 수수료 기준일을 계약서에 명시할 수 있나요?"
+  ];
+}
+
 export function createWeddingMcpServer(): McpServer {
   const server = new McpServer({
     name: "wedding-manager-mcp",
@@ -173,11 +232,12 @@ export function createWeddingMcpServer(): McpServer {
       inputSchema: {
         weddingDate: z.string().describe("Wedding date. Supports YYYY-MM-DD, YYYY.M.D, or 2026년 10월 3일."),
         currentDate: z.string().optional().describe("Current date. Defaults to today."),
-        priorities: z.array(z.string()).optional().describe("Known priorities such as venue, budget, family, guests, honeymoon.")
+        priorities: z.array(z.string()).optional().describe("Known priorities such as venue, budget, family, guests, honeymoon."),
+        openItems: z.array(z.string()).optional().describe("아직 못 끝낸 준비 항목. 예: 청첩장, 하객 리스트, BGM, 식전영상.")
       },
       annotations: { title: "결혼 준비 일정", ...readOnlyAnnotations }
     },
-    async ({ weddingDate, currentDate, priorities }) => {
+    async ({ weddingDate, currentDate, priorities, openItems }) => {
       const target = parseDate(weddingDate);
       const today = currentDate ? parseDate(currentDate) : new Date();
       if (!target || !today) {
@@ -187,6 +247,7 @@ export function createWeddingMcpServer(): McpServer {
       const dday = daysBetween(today, target);
       const tasks = timelineForDday(dday);
       const focus = priorities?.length ? priorities.join(", ") : "예산, 하객, 업체 계약";
+      const pendingAdvice = pendingTimelineAdvice(openItems);
 
       return {
         content: [{
@@ -196,6 +257,11 @@ export function createWeddingMcpServer(): McpServer {
             dday >= 0 ? `예식일까지 D-${dday}일입니다.` : `예식일로부터 ${Math.abs(dday)}일 지났습니다.`,
             `우선순위: ${focus}`,
             "",
+            ...(pendingAdvice.length ? [
+              "### 입력한 미완료 항목 우선순위",
+              ...pendingAdvice.map(task => `- ${task}`),
+              ""
+            ] : []),
             "### 지금 바로 할 일",
             ...tasks.map(task => `- ${task}`),
             "",
@@ -293,6 +359,7 @@ export function createWeddingMcpServer(): McpServer {
         .sort((a, b) => a.price - b.price);
       const cheapest = enriched[0];
       const bestComparable = [...enriched].sort((a, b) => a.risks.length - b.risks.length || a.price - b.price)[0];
+      const questions = quoteQuestionSet(quotes);
 
       return {
         content: [{
@@ -310,9 +377,7 @@ export function createWeddingMcpServer(): McpServer {
             }),
             "",
             "### 업체에 보낼 확인 질문",
-            "- 이 견적에 부가세, 봉사료, 출장비, 원본/보정본, 취소 수수료가 모두 포함되어 있나요?",
-            "- 계약 후 추가될 수 있는 옵션과 최대 금액을 적어주실 수 있나요?",
-            "- 잔금일과 일정 변경 수수료 기준일을 계약서에 명시할 수 있나요?"
+            ...questions.map(question => `- ${question}`)
           ].join("\n")
         }]
       };

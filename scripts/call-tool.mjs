@@ -3,9 +3,10 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const samples = {
   wedding_timeline: {
-    weddingDate: "2026-10-03",
+    weddingDate: "2026-07-20",
     currentDate: "2026-06-18",
-    priorities: ["예산", "웨딩홀", "양가 공유"]
+    priorities: ["하객", "본식 운영", "양가 공유"],
+    openItems: ["청첩장", "하객 리스트", "BGM"]
   },
   wedding_budget_review: {
     totalBudget: "3천만원",
