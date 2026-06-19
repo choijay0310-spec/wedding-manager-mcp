@@ -96,6 +96,7 @@ function statusLabel(status: "todo" | "doing" | "done" | "blocked"): string {
 
 function taskCheckTarget(task: { task: string; owner: string }): string {
   if (/웨딩홀|식대|보증|잔금/.test(task.task)) return "웨딩홀 담당자";
+  if (/촬영|스냅|사진/.test(task.task)) return "스튜디오 또는 촬영 작가";
   if (/청첩/.test(task.task)) return "청첩장 업체 또는 문구 결정자";
   if (/한복|예복|드레스|메이크/.test(task.task)) return "의상 업체와 양가 부모님";
   if (/축가/.test(task.task)) return "축가 후보자";
@@ -113,6 +114,7 @@ function followUpPrompt(topic: string): string {
 function timelineFollowUpTopic(dday: number, priorities: string[] | undefined): string {
   const priorityText = (priorities ?? []).join(" ").toLowerCase();
   if (dday < 0) return "정산과 감사 인사";
+  if (/촬영|스냅|사진|studio|photo/.test(priorityText)) return "웨딩촬영 준비 체크리스트";
   if (dday <= 45) return "본식 최종 체크리스트";
   if (/honeymoon|신혼|여행/.test(priorityText)) return "신혼여행 준비";
   return "부모님 공유 문구";
@@ -148,6 +150,9 @@ function vendorFactRequest(fact: string): string {
   if (/출장|추가|별도|금액|비용|봉사료|음주류|앨범|원본|보정/.test(fact)) {
     return `${fact}: 포함/별도 여부와 추가 금액 상한 확인 부탁드립니다.`;
   }
+  if (/시안|소품|드레스|헤어변형|촬영순서|촬영 순서/.test(fact)) {
+    return `${fact}: 준비 주체, 당일 진행 순서, 추가 비용 여부 확인 부탁드립니다.`;
+  }
   return `${fact}: 가능 여부와 견적 변동 여부 확인 부탁드립니다.`;
 }
 
@@ -176,6 +181,7 @@ function timelineForDday(dday: number): string[] {
   if (dday > 45) {
     return [
       "청첩장 문구, 모바일 청첩장, 하객 리스트, 식전영상, BGM을 확정하세요.",
+      "웨딩촬영이 남아 있다면 촬영 시안, 소품, 드레스 순서, 헤어변형 순서를 스튜디오와 맞추세요.",
       "보증 인원과 실제 참석 예상 인원의 차이를 다시 계산하세요.",
       "사회자 큐시트와 혼주/친구 역할 분담표를 공유 가능한 문장으로 정리하세요."
     ];
@@ -191,6 +197,9 @@ function pendingTimelineAdvice(openItems: string[] | undefined): string[] {
   if (!openItems?.length) return [];
 
   return openItems.map(item => {
+    if (/웨딩촬영|촬영|스튜디오|사진/.test(item)) {
+      return `${item}: 촬영 시안 5~10장, 개인 소품, 드레스 순서, 헤어변형 순서를 먼저 확정하세요. 빠지면 당일 촬영 시간이 밀립니다.`;
+    }
     if (/청첩|초대/.test(item)) {
       return `${item}: 문구 확정 -> 모바일/종이 제작 -> 발송 대상 분리까지 마감하세요. 늦어지면 참석률 예측과 보증 인원 조정이 같이 밀립니다.`;
     }
@@ -251,7 +260,7 @@ function quoteQuestionSet(quotes: Array<{ category: string; included?: string[];
   if (/스냅|사진|DVD|영상|앨범|보정|원본/.test(text)) {
     return [
       "원본 제공, 보정 컷 수, 앨범 포함 여부, 납품 예정일이 견적에 포함되어 있나요?",
-      "대표 작가 지정, 2인 촬영, 촬영 시작/종료 시간, 출장비가 별도인지 확인 부탁드립니다.",
+      "대표 작가 지정, 2인 촬영, 촬영 시작/종료 시간, 시안 공유 방식, 출장비가 별도인지 확인 부탁드립니다.",
       "잔금일, 일정 변경 수수료, 취소 수수료와 파일 보관 기간을 계약서에 명시할 수 있나요?"
     ];
   }
