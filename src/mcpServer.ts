@@ -96,7 +96,7 @@ function statusLabel(status: "todo" | "doing" | "done" | "blocked"): string {
 
 function taskCheckTarget(task: { task: string; owner: string }): string {
   if (/웨딩홀|식대|보증|잔금/.test(task.task)) return "웨딩홀 담당자";
-  if (/촬영|스냅|사진/.test(task.task)) return "스튜디오 또는 촬영 작가";
+  if (/촬영|스냅|사진|시안|소품|헤어변형/.test(task.task)) return "스튜디오 또는 촬영 작가";
   if (/청첩/.test(task.task)) return "청첩장 업체 또는 문구 결정자";
   if (/한복|예복|드레스|메이크/.test(task.task)) return "의상 업체와 양가 부모님";
   if (/축가/.test(task.task)) return "축가 후보자";
@@ -111,10 +111,10 @@ function followUpPrompt(topic: string): string {
   return `${topic}도 이어서 정리해드릴까요?`;
 }
 
-function timelineFollowUpTopic(dday: number, priorities: string[] | undefined): string {
-  const priorityText = (priorities ?? []).join(" ").toLowerCase();
+function timelineFollowUpTopic(dday: number, priorities: string[] | undefined, openItems: string[] | undefined): string {
+  const priorityText = `${(priorities ?? []).join(" ")} ${(openItems ?? []).join(" ")}`.toLowerCase();
   if (dday < 0) return "정산과 감사 인사";
-  if (/촬영|스냅|사진|studio|photo/.test(priorityText)) return "웨딩촬영 준비 체크리스트";
+  if (/촬영|스냅|사진|시안|소품|헤어변형|studio|photo/.test(priorityText)) return "웨딩촬영 준비 체크리스트";
   if (dday <= 45) return "본식 최종 체크리스트";
   if (/honeymoon|신혼|여행/.test(priorityText)) return "신혼여행 준비";
   return "부모님 공유 문구";
@@ -196,27 +196,38 @@ function timelineForDday(dday: number): string[] {
 function pendingTimelineAdvice(openItems: string[] | undefined): string[] {
   if (!openItems?.length) return [];
 
-  return openItems.map(item => {
-    if (/웨딩촬영|촬영|스튜디오|사진/.test(item)) {
-      return `${item}: 촬영 시안 5~10장, 개인 소품, 드레스 순서, 헤어변형 순서를 먼저 확정하세요. 빠지면 당일 촬영 시간이 밀립니다.`;
+  const seen = new Set<string>();
+  const advice: string[] = [];
+  for (const item of openItems) {
+    if (/웨딩촬영|촬영|스튜디오|사진|시안|소품|헤어변형|드레스\s*순서/.test(item)) {
+      if (seen.has("shooting")) continue;
+      seen.add("shooting");
+      advice.push(`웨딩촬영: 촬영 시안 5~10장, 개인 소품, 드레스 순서, 헤어변형 순서를 먼저 확정하세요. 빠지면 당일 촬영 시간이 밀립니다.`);
+      continue;
     }
     if (/청첩|초대/.test(item)) {
-      return `${item}: 문구 확정 -> 모바일/종이 제작 -> 발송 대상 분리까지 마감하세요. 늦어지면 참석률 예측과 보증 인원 조정이 같이 밀립니다.`;
+      advice.push(`${item}: 문구 확정 -> 모바일/종이 제작 -> 발송 대상 분리까지 마감하세요. 늦어지면 참석률 예측과 보증 인원 조정이 같이 밀립니다.`);
+      continue;
     }
     if (/하객|명단|리스트|인원/.test(item)) {
-      return `${item}: 양가/친구/직장으로 나누고 참석 가능성을 높음/보통/낮음으로 표시하세요. 보증 인원 변경 가능일 전까지 숫자를 잠가야 식대 손실을 줄입니다.`;
+      advice.push(`${item}: 양가/친구/직장으로 나누고 참석 가능성을 높음/보통/낮음으로 표시하세요. 보증 인원 변경 가능일 전까지 숫자를 잠가야 식대 손실을 줄입니다.`);
+      continue;
     }
     if (/BGM|음악|식전영상|영상|축가/.test(item)) {
-      return `${item}: 곡/영상 후보를 3개 이하로 줄이고 사회자 큐시트와 입장/퇴장 타이밍에 연결하세요. 늦어지면 리허설과 음향 체크가 부실해집니다.`;
+      advice.push(`${item}: 곡/영상 후보를 3개 이하로 줄이고 사회자 큐시트와 입장/퇴장 타이밍에 연결하세요. 늦어지면 리허설과 음향 체크가 부실해집니다.`);
+      continue;
     }
     if (/잔금|계약|취소|수수료/.test(item)) {
-      return `${item}: 계약서 문장, 잔금일, 변경/취소 수수료 기준일을 캘린더에 같이 넣으세요.`;
+      advice.push(`${item}: 계약서 문장, 잔금일, 변경/취소 수수료 기준일을 캘린더에 같이 넣으세요.`);
+      continue;
     }
     if (/한복|예복|드레스|메이크|스드메/.test(item)) {
-      return `${item}: 피팅/수령/반납 날짜와 별도 비용을 같은 메모에 묶어 확인하세요.`;
+      advice.push(`${item}: 피팅/수령/반납 날짜와 별도 비용을 같은 메모에 묶어 확인하세요.`);
+      continue;
     }
-    return `${item}: 담당자, 마감일, 업체 확인 필요 여부를 정해서 오늘 안에 다음 행동 1개를 확정하세요.`;
-  });
+    advice.push(`${item}: 담당자, 마감일, 업체 확인 필요 여부를 정해서 오늘 안에 다음 행동 1개를 확정하세요.`);
+  }
+  return advice;
 }
 
 function classifyBudgetItem(name: string): "venue" | "vendor" | "beauty" | "guest" | "optional" | "other" {
@@ -310,6 +321,7 @@ export function createWeddingMcpServer(): McpServer {
       const tasks = timelineForDday(dday);
       const focus = priorities?.length ? priorities.join(", ") : "예산, 하객, 업체 계약";
       const pendingAdvice = pendingTimelineAdvice(openItems);
+      const selectedTasks = pendingAdvice.length ? pendingAdvice.slice(0, 2) : tasks.slice(0, 2);
 
       return {
         content: [{
@@ -318,10 +330,10 @@ export function createWeddingMcpServer(): McpServer {
             dday >= 0 ? `예식일까지 D-${dday}일입니다.` : `예식일로부터 ${Math.abs(dday)}일 지났습니다.`,
             `먼저 볼 우선순위는 ${focus}입니다.`,
             "",
-            "### 먼저 할 2가지",
-            ...(pendingAdvice.length ? pendingAdvice.slice(0, 2).map(task => `- ${task}`) : tasks.slice(0, 2).map(task => `- ${task}`)),
+            selectedTasks.length > 1 ? "### 먼저 할 2가지" : "### 먼저 할 일",
+            ...selectedTasks.map(task => `- ${task}`),
             "",
-            `다음 단계로 ${timelineFollowUpTopic(dday, priorities)}도 정리해드릴까요?`
+            `다음 단계로 ${timelineFollowUpTopic(dday, priorities, openItems)}도 정리해드릴까요?`
           ].join("\n")
         }]
       };
